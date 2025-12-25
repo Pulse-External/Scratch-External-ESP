@@ -1,129 +1,147 @@
-// ===================== GLOBAL ESP SETTINGS =====================
-window._ESP = true;              
-window._IncludeClones = true;    
-window._OnlyClones = false;      
-window._Color = "#FF0000";       
-window._BoxType = "Corner";      
-window._BoxFilled = false;       
-window._BoxStatic = false;       
-window._OnlyVisibleOnScreen = true;  
+// ===================== GLOBAL SETTINGS =====================
+window._ESP = true;
+window._ESP_Sprites = ["Enemy", "Sprite1", "Boss"]; 
 
-window._ESP_Sprites = [
-    "Sprite1",
-    "Sprite2",
-    "Enemy",
-    "Boss"
-];
-// ================================================================
+// --- NEUE SIZING MODI ---
+// "dynamic" = Folgt den Scratch-Bounds (Standard)
+// "static"  = Nutzt feste Werte (_StaticWidth / _StaticHeight)
+// "resize"  = Berechnet Größe basierend auf Kostüm-Skalierung (sehr präzise)
+window._SizeMode = "resize"; 
+
+window._StaticWidth = 40;   // Nur für Modus "static"
+window._StaticHeight = 60;  // Nur für Modus "static"
+
+window._BoxPadding = 1.2;   // Puffer um den Sprite (1.0 = eng, 1.5 = locker)
+window._OnlyVisibleOnScreen = true; 
+
+// --- BOX SETTINGS ---
+window._BoxType = "Corner";        
+window._BoxColor = "#FF0000";      
+window._BoxThickness = 1.5;         
+
+// --- ÜBRIGE SETTINGS ---
+window._Snaplines = true;
+window._SnaplineColor = "#00FF00"; 
+window._SnaplineOpacity = 0.4;     
+window._Crosshair = true;
+window._CrosshairSize = 8;
+// ============================================================
 
 (function() {
-    if (!window.vm || !window.renderer) return;
-
-    const gameCanvas = document.querySelector("canvas");
-    if (!gameCanvas) return;
-
-    const overlay = document.createElement("canvas");
-    overlay.style.position = "absolute";
-    overlay.style.pointerEvents = "none";
-    overlay.style.zIndex = 999999;
-    document.body.appendChild(overlay);
-    const octx = overlay.getContext("2d");
-
-    function updateOverlayPos() {
-        const rect = gameCanvas.getBoundingClientRect();
-        overlay.style.left = rect.left + "px";
-        overlay.style.top = rect.top + "px";
-        overlay.width = rect.width;
-        overlay.height = rect.height;
-    }
-
-    updateOverlayPos();
-    window.addEventListener("resize", updateOverlayPos);
-    window.addEventListener("scroll", updateOverlayPos);
-
-    const renderer = window.renderer;
-    const vm = window.vm;
-
-    function drawCornerESP(x, y, w, h) {
-        const len = Math.min(w, h) * 0.25;
-        octx.strokeStyle = window._Color;
-        octx.lineWidth = 2;
-        octx.beginPath();
-
-        octx.moveTo(x, y); octx.lineTo(x + len, y);
-        octx.moveTo(x, y); octx.lineTo(x, y + len);
-
-        octx.moveTo(x + w, y); octx.lineTo(x + w - len, y);
-        octx.moveTo(x + w, y); octx.lineTo(x + w, y + len);
-
-        octx.moveTo(x, y + h); octx.lineTo(x + len, y + h);
-        octx.moveTo(x, y + h); octx.lineTo(x, y + h - len);
-
-        octx.moveTo(x + w, y + h); octx.lineTo(x + w - len, y + h);
-        octx.moveTo(x + w, y + h); octx.lineTo(x + w, y + h - len);
-
-        octx.stroke();
-    }
-
-    function drawESP() {
-        requestAnimationFrame(drawESP);
-
-        if (!window._ESP) {
-            octx.clearRect(0, 0, overlay.width, overlay.height);
+    const startESP = () => {
+        const gameCanvas = document.querySelector("canvas");
+        if (!gameCanvas || !window.vm || !window.renderer) {
+            setTimeout(startESP, 500);
             return;
         }
 
-        updateOverlayPos();
-        octx.clearRect(0, 0, overlay.width, overlay.height);
+        const old = document.getElementById("autosize-esp");
+        if (old) old.remove();
 
-        vm.runtime.targets.forEach(target => {
-            if (target.isStage) return;               
-            if (!target.visible) return;
-            if (typeof target.x !== "number" || typeof target.y !== "number") return;
-            if (!window._IncludeClones && target.isOriginal === false) return;
-            if (window._OnlyClones && target.isOriginal !== false) return;
-            if (!window._ESP_Sprites.includes(target.sprite.name)) return;
+        const overlay = document.createElement("canvas");
+        overlay.id = "autosize-esp";
+        overlay.style = "position:absolute; pointer-events:none; z-index:999999;";
+        document.body.appendChild(overlay);
+        const octx = overlay.getContext("2d");
 
-            const bounds = target.getBounds();
-            if (!bounds || (bounds.right - bounds.left <= 0) || (bounds.top - bounds.bottom <= 0)) return;
+        function update() {
+            if (!gameCanvas) return false;
+            const rect = gameCanvas.getBoundingClientRect();
+            if (overlay.width !== rect.width || overlay.height !== rect.height) {
+                overlay.width = rect.width;
+                overlay.height = rect.height;
+            }
+            overlay.style.left = rect.left + "px";
+            overlay.style.top = rect.top + "px";
+            return true;
+        }
 
-            const [cx, cy] = renderer.scratchToScreenPosition(target.x, target.y);
-
-            if (window._OnlyVisibleOnScreen) {
-                if (cx + bounds.right < 0 || cx - bounds.left > overlay.width) return;
-                if (cy + bounds.bottom < 0 || cy - bounds.top > overlay.height) return;
+        function draw() {
+            requestAnimationFrame(draw);
+            if (!window._ESP || !update()) { 
+                octx.clearRect(0, 0, overlay.width, overlay.height); 
+                return; 
             }
 
-            let w = Math.abs(bounds.right - bounds.left) * 1.75;
-            let h = Math.abs(bounds.top - bounds.bottom) * 1.5;
+            octx.clearRect(0, 0, overlay.width, overlay.height);
 
-            if (window._BoxStatic) { w = 80; h = 100; }
-
-            w *= overlay.width / renderer.defaultWidth;
-            h *= overlay.height / renderer.defaultHeight;
-
-            const x = cx - w / 2;
-            const y = cy - h / 2;
-
-            if (window._BoxFilled) {
-                octx.globalAlpha = 0.25;
-                octx.fillStyle = window._Color;
-                octx.fillRect(x, y, w, h);
-                octx.globalAlpha = 1;
+            // Crosshair
+            if (window._Crosshair) {
+                const mx = overlay.width / 2, my = overlay.height / 2;
+                octx.strokeStyle = window._CrosshairColor;
+                octx.lineWidth = 1.5;
+                octx.beginPath();
+                octx.moveTo(mx - window._CrosshairSize, my); octx.lineTo(mx + window._CrosshairSize, my);
+                octx.moveTo(mx, my - window._CrosshairSize); octx.lineTo(mx, my + window._CrosshairSize);
+                octx.stroke();
             }
 
-            if (window._BoxType === "Full") {
-                octx.strokeStyle = window._Color;
-                octx.lineWidth = 2;
-                octx.strokeRect(x, y, w, h);
-            }
+            window.vm.runtime.targets.forEach(target => {
+                if (target.isStage || !target.visible) return;
+                if (!window._ESP_Sprites.includes(target.sprite.name)) return;
 
-            if (window._BoxType === "Corner") {
-                drawCornerESP(x, y, w, h);
-            }
-        });
-    }
-    
-    drawESP();
-    console.log("External ESP | PulseExternal");
+                const screenPos = window.renderer.scratchToScreenPosition(target.x, target.y);
+                const cx = screenPos[0], cy = screenPos[1];
+
+                if (window._OnlyVisibleOnScreen) {
+                    if (cx < 0 || cx > overlay.width || cy < 0 || cy > overlay.height) return;
+                }
+
+                let w, h;
+                const scaleFactor = overlay.width / 480;
+
+                // --- LOGIK FÜR AUTO-SIZING ---
+                if (window._SizeMode === "static") {
+                    w = window._StaticWidth * scaleFactor;
+                    h = window._StaticHeight * scaleFactor;
+                } 
+                else if (window._SizeMode === "resize") {
+                    // Nutzt die Kostüm-Größe + Scratch Size-Variable
+                    const bounds = target.getBounds();
+                    const costumeSize = target.size / 100;
+                    w = Math.abs(bounds.right - bounds.left) * scaleFactor * costumeSize * window._BoxPadding;
+                    h = Math.abs(bounds.top - bounds.bottom) * scaleFactor * costumeSize * window._BoxPadding;
+                } 
+                else { // "dynamic"
+                    const bounds = target.getBounds();
+                    w = Math.abs(bounds.right - bounds.left) * scaleFactor * window._BoxPadding;
+                    h = Math.abs(bounds.top - bounds.bottom) * scaleFactor * window._BoxPadding;
+                }
+
+                const x = cx - w / 2, y = cy - h / 2;
+
+                // Snaplines
+                if (window._Snaplines) {
+                    octx.strokeStyle = window._SnaplineColor;
+                    octx.globalAlpha = window._SnaplineOpacity;
+                    octx.beginPath(); octx.moveTo(overlay.width/2, overlay.height); octx.lineTo(cx, cy); octx.stroke();
+                    octx.globalAlpha = 1.0;
+                }
+
+                // Box
+                octx.strokeStyle = window._BoxColor;
+                octx.lineWidth = window._BoxThickness;
+                if (window._BoxType === "Corner") {
+                    const l = w * 0.25;
+                    octx.beginPath();
+                    octx.moveTo(x, y+l); octx.lineTo(x, y); octx.lineTo(x+l, y);
+                    octx.moveTo(x+w-l, y); octx.lineTo(x+w, y); octx.lineTo(x+w, y+l);
+                    octx.moveTo(x, y+h-l); octx.lineTo(x, y+h); octx.lineTo(x+l, y+h);
+                    octx.moveTo(x+w-l, y+h); octx.lineTo(x+w, y+h); octx.lineTo(x+w, y+h-l);
+                    octx.stroke();
+                } else {
+                    octx.strokeRect(x, y, w, h);
+                }
+
+                // Name
+                octx.fillStyle = window._BoxColor;
+                octx.font = "bold 10px Arial";
+                octx.textAlign = "center";
+                octx.fillText(target.sprite.name, cx, y - 5);
+            });
+        }
+        draw();
+    };
+    startESP();
+    console.log("ESP V8: Sizing-Mode '" + window._SizeMode + "' geladen.");
 })();
