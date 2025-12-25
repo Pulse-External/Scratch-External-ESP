@@ -68,7 +68,6 @@ window._ESP_Sprites = [
     function drawESP() {
         requestAnimationFrame(drawESP);
 
-        // Wenn ESP deaktiviert ist, Overlay leeren
         if (!window._ESP) {
             octx.clearRect(0, 0, overlay.width, overlay.height);
             return;
