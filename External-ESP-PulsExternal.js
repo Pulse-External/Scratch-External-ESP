@@ -124,7 +124,7 @@ window._ESP_Sprites = [
             }
         });
     }
-
+    
     drawESP();
-    console.log("External ESP Loaded.");
+    console.log("External ESP | PulseExternal");
 })();
